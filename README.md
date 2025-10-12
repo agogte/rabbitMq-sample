@@ -1,94 +1,186 @@
 # RabbitMQ Sample
 
-This project demonstrates a simple RabbitMQ setup simulating a high-load scenario (e.g., tax day submissions). It uses a durable queue to buffer messages, a publisher to send messages with unique confirmation numbers, and a subscriber to process them sequentially with a 3-second delay per message. The publisher mimics an API accepting submissions instantly, while the subscriber processes them asynchronously, ensuring the system isn't overwhelmed.
+This project demonstrates a scalable RabbitMQ setup simulating a high-load scenario (e.g., tax day submissions). It uses an Express.js API to accept tax submissions via a POST `/submit` endpoint, sending them to a durable RabbitMQ queue (`taxSubmissions`) with persistent messages. The API returns unique confirmation numbers instantly, while a background subscriber processes submissions asynchronously with a 3-second delay per message. Swagger API documentation is provided for easy endpoint exploration and testing.
+
+## Features
+
+- **Express API**: Handles POST requests at `/submit`, enqueuing tax submissions and returning confirmation numbers.
+- **RabbitMQ Integration**: Uses a durable queue with persistent messages to ensure reliability across restarts.
+- **Modular Design**: Separates concerns into `app.js` (API), `rabbitmq.js` (connection management with Builder Pattern), and `publisher.js` (message publishing).
+- **Swagger Docs**: Interactive API documentation at `http://localhost:3000/api-docs` for testing the `/submit` endpoint.
+- **Single Command Execution**: Run both API and subscriber with `npm start` using `start.js`.
 
 ## Prerequisites
-- **Node.js**: Install Node.js (v14 or higher recommended).
-- **RabbitMQ**: Install and run RabbitMQ locally (e.g., via Docker: `docker run -p 5672:5672 rabbitmq`).
-- **Dependencies**: Install the required Node.js package:
+
+- **Node.js**: v14 or higher (tested with v18.20.8).
+- **RabbitMQ**: Running locally (e.g., via Docker: `docker run -d --name rabbitmq -p 127.0.0.1:5672:5672 rabbitmq`).
+- **Dependencies**: Install via:
   ```bash
-  npm install amqplib uuid
+  npm install
   ```
 
 ## Project Structure
-- `publisher.js`: Simulates an API sending tax submissions to a RabbitMQ queue, generating unique confirmation numbers for each.
-- `subscriber.js`: Consumes messages from the queue one at a time, processing each with a 3-second delay to simulate tax processing.
+
+- `src/app.js`: Express API with `/submit` endpoint and Swagger UI at `/api-docs`.
+- `src/rabbitmq.js`: RabbitMQ connection and channel management using the Builder Pattern.
+- `src/publisher.js`: Publishes tax submissions to the `taxSubmissions` queue.
+- `subscriber.js`: Consumes and processes queue messages sequentially (3-second delay).
+- `start.js`: Runs both API and subscriber concurrently.
+- `.env`: Configuration for `RABBITMQ_URL` and `PORT`.
+- `package.json`: Defines dependencies and scripts.
 
 ## Setup
+
 1. **Start RabbitMQ**:
+
    ```bash
-   docker run -it --rm --name rabbitmq -p 5672:5672 rabbitmq
+   docker run -d --name rabbitmq -p 127.0.0.1:5672:5672 rabbitmq
    ```
-   Or install RabbitMQ locally and start it (`sudo service rabbitmq-server start`).
+
+   Or, if installed locally:
+
+   ```bash
+   sudo service rabbitmq-server start
+   ```
 
 2. **Install Dependencies**:
-   In the project directory, run:
+
    ```bash
    npm install
    ```
 
-3. **Save the Code**:
-   - Copy the `publisher.js` and `subscriber.js` files (provided below) into your project directory.
-   - Ensure both files use the same queue name (`taxSubmissions`) and connect to `amqp://localhost`.
+3. **Configure Environment**:
+   Create `.env` in the project root:
+
+   ```bash
+   echo "RABBITMQ_URL=amqp://localhost" > .env
+   echo "PORT=3000" >> .env
+   ```
+
+4. **Save Code Files**:
+   Ensure `src/app.js`, `src/rabbitmq.js`, `src/publisher.js`, `subscriber.js`, `start.js`, and `package.json` are in place (see project repository or implementation details).
 
 ## Usage
-This project simulates a tax day scenario where users submit tax files, receive instant confirmation numbers, and processing happens asynchronously.
 
-### Running the Subscriber
-1. Open a terminal and run the subscriber to start processing messages:
-   ```bash
-   node subscriber.js
-   ```
-   - It waits for messages in the `taxSubmissions` queue.
-   - Processes one message every 3 seconds, printing "Processing..." and "Results ready!".
+This project simulates a tax submission system where users send tax files via an API, receive instant confirmation numbers, and a background worker processes submissions asynchronously.
 
-### Running the Publisher
-1. In another terminal, run the publisher to simulate submissions:
-   ```bash
-   node publisher.js
-   ```
-   - Sends 5 sample tax submissions to the queue.
-   - Prints confirmation numbers immediately for each submission.
+### Running the Application
 
-### Expected Output
-- **Publisher**: Prints all confirmation numbers instantly (e.g., `Submission received! Your confirmation number: abc123-...`).
-- **Subscriber**: Processes one message every 3 seconds, showing:
+Run both the API and subscriber with a single command:
+
+```bash
+npm start
+```
+
+Output:
+
+```
+Started Express API and RabbitMQ Subscriber
+[API]: Connected to RabbitMQ at amqp://localhost
+[API]: Express API running on port 3000
+[Subscriber]: Waiting for tax submissions...
+```
+
+Alternatively:
+
+- Run only the API:
+  ```bash
+  npm run start:api
   ```
-  Waiting for tax submissions...
-  Processing tax submission: abc123... for user-1
-  [3s pause]
-  Processed tax submission: abc123... - Results ready!
-  Processing tax submission: def456... for user-2
-  [3s pause]
-  Processed tax submission: def456... - Results ready!
-  ...
+- Run only the subscriber:
+  ```bash
+  npm run start:subscriber
   ```
+
+### Accessing Swagger API Docs
+
+- Open `http://localhost:3000/api-docs` in a browser to view interactive Swagger UI.
+- Use the "Try it out" feature to test the POST `/submit` endpoint with a sample request:
+  ```json
+  {
+    "userId": "user-1",
+    "taxData": "Fake tax file"
+  }
+  ```
+
+### Testing the API
+
+Send a POST request to submit a tax file:
+
+```bash
+curl -X POST http://localhost:3000/submit -H "Content-Type: application/json" -d '{"userId":"user-1","taxData":"Fake tax file"}'
+```
+
+Response (immediate):
+
+```json
+{
+  "message": "Submission received",
+  "confirmation": "abc123-4567-8901-2345-678901234567"
+}
+```
+
+Subscriber output (every 3 seconds):
+
+```
+[Subscriber]: Processing tax submission: abc123... for user-1
+[Subscriber]: Processed tax submission: abc123... - Results ready!
+```
+
+Simulate multiple submissions:
+
+```bash
+for i in {1..5}; do
+  curl -X POST http://localhost:3000/submit -H "Content-Type: application/json" -d "{\"userId\":\"user-$i\",\"taxData\":\"Fake tax file $i\"}"
+done
+```
 
 ## Code Details
-### publisher.js
-Sends messages to a durable queue with persistent messages, ensuring they survive RabbitMQ restarts. Each message includes a unique confirmation number and sample tax data.
 
-### subscriber.js
-Consumes messages one at a time (`prefetch(1)`), processes them with a 3-second delay, and acknowledges them. Uses a durable queue for reliability.
+- **app.js**: Defines the Express API with a `/submit` endpoint, integrates Swagger UI, and initializes RabbitMQ via the builder.
+- **rabbitmq.js**: Uses the Builder Pattern for flexible RabbitMQ configuration, with retry logic for robust connections.
+- **publisher.js**: Sends tax submissions to the `taxSubmissions` queue with unique confirmation numbers.
+- **subscriber.js**: Processes messages one at a time with a 3-second delay, ensuring sequential processing.
+- **start.js**: Spawns API and subscriber processes concurrently with retry logic.
 
 ## Testing the Simulation
+
 1. Start RabbitMQ.
-2. Run one instance of `subscriber.js`.
-3. Run `publisher.js` to send 5 messages.
-4. Observe instant confirmations from the publisher and sequential processing (every 3 seconds) in the subscriber.
-5. To test persistence:
-   - Send messages with the publisher.
-   - Stop RabbitMQ (`docker stop rabbitmq` or `sudo service rabbitmq-server stop`).
-   - Restart RabbitMQ.
-   - Run the subscriber—it should process the messages.
+2. Run `npm start`.
+3. Send POST requests via `curl`, Swagger UI, or a test script (e.g., `test.js`).
+4. Verify:
+   - API returns confirmations instantly.
+   - Subscriber processes one message every 3 seconds.
+5. Test persistence:
+   - Send submissions, stop RabbitMQ (`docker stop rabbitmq`), restart it, and run `npm run start:subscriber` to process queued messages.
 
 ## Scaling for Real-Life
-- **More Submissions**: Increase the loop in `publisher.js` (e.g., `i <= 1000`) to simulate higher load.
-- **Multiple Workers**: Run multiple `subscriber.js` instances for parallel processing (loses strict sequential output).
-- **Monitoring**: Use RabbitMQ's management plugin (`rabbitmq-plugins enable rabbitmq_management` and visit `http://localhost:15672`) to monitor queue length.
+
+- **More Submissions**: Use a test script to send thousands of requests (e.g., modify `test.js`).
+- **Multiple Workers**: Run additional `subscriber.js` instances for parallel processing (loses sequential output).
+- **Monitoring**: Enable RabbitMQ management UI:
+  ```bash
+  docker exec rabbitmq rabbitmq-plugins enable rabbitmq_management
+  ```
+  Visit `http://localhost:15672` (user: `guest`, password: `guest`) to monitor queue length.
+
+## Troubleshooting
+
+- **RabbitMQ Connection Errors**:
+  - Ensure RabbitMQ is running (`docker ps` or `sudo service rabbitmq-server status`).
+  - Verify `.env` has `RABBITMQ_URL=amqp://localhost` or `amqp://127.0.0.1:5672`.
+  - Test connectivity: `telnet 127.0.0.1 5672`.
+- **Swagger UI Issues**:
+  - If `http://localhost:3000/api-docs` shows "No operations defined in spec!", check console for `Swagger Spec` output to verify `/submit` inclusion.
+  - Ensure `swagger-ui-express` and `swagger-jsdoc` are installed (`npm list swagger-ui-express swagger-jsdoc`).
+- **Dependencies**:
+  ```bash
+  rm -rf node_modules package-lock.json
+  npm install
+  ```
 
 ## Notes
-- Ensure RabbitMQ is running on `amqp://localhost`.
+
 - Messages persist due to `durable: true` and `persistent: true`.
-- For a real API, integrate `publisher.js` into an HTTP endpoint (e.g., Express.js) to return confirmations to clients.
-- To add result notifications, consider a reply queue or database to store processed results.
+- For production, secure `/api-docs` with authentication and add rate limiting (e.g., using `express-rate-limit`).
+- Extend with a reply queue for processing results or a `/status` endpoint for submission
