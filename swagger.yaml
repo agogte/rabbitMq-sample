@@ -1,0 +1,41 @@
+# swagger.yaml
+openapi: 3.0.0
+info:
+  title: Tax Submission API
+  version: 1.0.0
+  description: API for submitting tax files to a RabbitMQ queue
+servers:
+  - url: http://localhost:3000
+    description: Local server
+paths:
+  /submit:
+    post:
+      summary: Submit tax data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, taxData]
+              properties:
+                userId:
+                  type: string
+                  example: user-123
+                taxData:
+                  type: string
+                  example: base64-tax-file
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  confirmation: { type: string }
+        "400":
+          description: Bad request
+        "500":
+          description: Server error

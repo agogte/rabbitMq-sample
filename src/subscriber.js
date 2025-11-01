@@ -1,35 +1,36 @@
-const amqp = require("amqplib/callback_api");
+// subscriber.js
+const { RabbitMQBuilder } = require("./src/rabbitmq");
 
-amqp.connect(`amqp://localhost`, (err, connection) => {
-  if (err) throw err;
+async function startSubscriber() {
+  const rabbitMQ = new RabbitMQBuilder()
+    .withUrl(process.env.RABBITMQ_URL || "amqp://rabbitmq:5672")
+    .withQueue("taxSubmissions", { durable: true })
+    .build();
 
-  connection.createChannel((err, channel) => {
-    if (err) throw err;
+  try {
+    await rabbitMQ.connectWithRetry({ retries: 15, delayMs: 3000 });
+    const channel = rabbitMQ.getChannel();
 
-    let queueName = "taxSubmissions";
-    channel.assertQueue(queueName, {
-      durable: true,
-    });
+    console.log("[Subscriber] Waiting for tax submissions...");
 
-    channel.prefetch(1);
-
-    channel.consume(
-      queueName,
-      (message) => {
-        let messageContent = JSON.parse(message.content.toString());
+    channel.consume("taxSubmissions", async (msg) => {
+      if (msg !== null) {
+        const data = JSON.parse(msg.content.toString());
         console.log(
-          `Processing tax submission: ${messageContent.confirmation} for ${messageContent.userId}`
+          `[Subscriber] Processing: ${data.confirmation} for ${data.userId}`
         );
 
-        //Simulate async processing (tax calculation delay)
-        setTimeout(() => {
-          console.log(
-            `Processed tax submission: ${messageContent.confirmation} - Results ready!!`
-          );
-          channel.ack(message);
-        }, 3000);
-      },
-      { noAck: false }
-    );
-  });
-});
+        // Simulate processing
+        await new Promise((res) => setTimeout(res, 3000));
+
+        console.log(`[Subscriber] Done: ${data.confirmation}`);
+        channel.ack(msg);
+      }
+    });
+  } catch (err) {
+    console.error("[Subscriber] Fatal error:", err);
+    process.exit(1);
+  }
+}
+
+startSubscriber();

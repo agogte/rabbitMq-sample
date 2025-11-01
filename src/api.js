@@ -1,55 +1,50 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const swaggerUi = require("swagger-ui-express");
-const swaggerJsdoc = require("swagger-jsdoc");
-const path = require("path"); // Add this line
+const yaml = require("yamljs");
 const { RabbitMQBuilder } = require("./rabbitmq");
 const { publishTaxSubmission } = require("./publisher");
+const { HttpStatusCode } = require("axios");
 
-dotenv.config({ quiet: true }); // Suppress dotenv logs
+dotenv.config({ quiet: true });
 
 const app = express();
 app.use(express.json());
 
-// Swagger configuration
-const swaggerOptions = {
-  definition: {
-    openapi: "3.0.0",
-    info: {
-      title: "Tax Submission API",
-      version: "1.0.0",
-      description: "API for submitting tax files to a RabbitMQ queue",
-    },
-    servers: [
-      {
-        url: `http://localhost:${process.env.PORT || 3000}`,
-        description: "Local server",
-      },
-    ],
-  },
-  apis: [path.join(__dirname, "api.js")], // Correct path for api.js
-};
+// // Swagger configuration
+// const swaggerOptions = {
+//   definition: {
+//     openapi: "3.0.0",
+//     info: {
+//       title: "Tax Submission API",
+//       version: "1.0.0",
+//       description: "API for submitting tax files to a RabbitMQ queue",
+//     },
+//     servers: [
+//       {
+//         url: `http://localhost:${process.env.PORT || 3000}`,
+//         description: "Local server",
+//       },
+//     ],
+//   },
+//   apis: [__filename],
+// };
 
-const swaggerDocs = swaggerJsdoc(swaggerOptions);
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+const swaggerDoc = yaml.load("./swagger.yaml");
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDoc));
 
-// Initialize RabbitMQ with builder
 const rabbitMQ = new RabbitMQBuilder()
   .withUrl(process.env.RABBITMQ_URL)
   .withQueue("taxSubmissions", { durable: true })
   .build();
 
-rabbitMQ.connect().catch((err) => {
-  console.error("Failed to initialize RabbitMQ:", err.message);
-  process.exit(1);
-});
-
 app.post("/submit", async (req, res, next) => {
   const { userId, taxData } = req.body;
 
-  // Input validation
   if (!userId || !taxData) {
-    return res.status(400).json({ error: "Missing userId or taxData" });
+    return res
+      .status(HttpStatusCode.BadRequest)
+      .json({ error: "Missing userId or taxData" });
   }
 
   try {
@@ -58,7 +53,7 @@ app.post("/submit", async (req, res, next) => {
       taxData,
       rabbitMQ
     );
-    res.status(202).json({
+    res.status(HttpStatusCode.Accepted).json({
       message: "Submission received",
       confirmation: confirmationNumber,
     });
@@ -70,18 +65,37 @@ app.post("/submit", async (req, res, next) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error("Error:", err.message);
-  res.status(500).json({ error: "Internal server error" });
+  res
+    .status(HttpStatusCode.InternalServerError)
+    .json({ error: "Internal server error" });
 });
 
 // Start the server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Express API running on port ${PORT}`);
-});
+async function startServer() {
+  try {
+    await rabbitMQ.connectWithRetry({
+      retries: 5,
+      delayMs: 3000,
+    });
+    console.log("[RabbitMQ] Connected - API is ready");
+    app.listen(PORT, () => console.log(`Express API running on port ${PORT}`));
+  } catch (err) {
+    console.error("[FATAL] Could not connect to RabbitMQ after retries", err);
+    process.exit(1);
+  }
+}
 
 // Graceful shutdown
 process.on("SIGTERM", async () => {
-  console.log("Shutting down...");
-  await rabbitMQ.close();
+  console.log("SIGTERM received – shutting down...");
+  if (rabbitMQ.channel) await rabbitMQ.close();
   process.exit(0);
 });
+process.on("SIGINT", async () => {
+  console.log("SIGINT received – shutting down...");
+  if (rabbitMQ.channel) await rabbitMQ.close();
+  process.exit(0);
+});
+
+startServer();

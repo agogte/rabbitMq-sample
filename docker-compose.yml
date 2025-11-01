@@ -1,0 +1,33 @@
+services:
+  api:
+    build: .
+    container_name: tax-api
+    ports:
+      - "3000:3000"
+    environment:
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - PORT=3000
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - taxnet
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: tax-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    networks:
+      - taxnet
+
+networks:
+  taxnet:
+    driver: bridge
