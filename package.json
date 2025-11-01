@@ -18,6 +18,7 @@
     "dotenv": "^17.2.3",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "yamljs": "^0.3.0"
   }
 }
