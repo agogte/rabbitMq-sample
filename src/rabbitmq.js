@@ -6,6 +6,7 @@ class RabbitMQBuilder {
     this.url = null;
     this.queue = null;
     this.queueOptions = {};
+    this.deadLetter = null;
     this.connection = null;
     this.channel = null;
   }
@@ -21,12 +22,36 @@ class RabbitMQBuilder {
     return this;
   }
 
+  // NEW: Configure a dead-letter exchange/queue for messages that are
+  // nacked with requeue=false (e.g. after processing failures).
+  withDeadLetter({ exchange, routingKey, queue }) {
+    this.deadLetter = { exchange, routingKey, queue };
+    this.queueOptions = {
+      ...this.queueOptions,
+      arguments: {
+        ...(this.queueOptions.arguments || {}),
+        "x-dead-letter-exchange": exchange,
+        "x-dead-letter-routing-key": routingKey,
+      },
+    };
+    return this;
+  }
+
   async connect() {
     if (this.connection && this.channel) return;
 
     this.connection = await amqp.connect(this.url);
     this.channel = await this.connection.createChannel();
     await this.channel.assertQueue(this.queue, this.queueOptions);
+
+    if (this.deadLetter) {
+      const { exchange, routingKey, queue } = this.deadLetter;
+      await this.channel.assertExchange(exchange, "direct", { durable: true });
+      await this.channel.assertQueue(queue, { durable: true });
+      await this.channel.bindQueue(queue, exchange, routingKey);
+      console.log(`[RabbitMQ] Dead-letter queue ready: ${queue}`);
+    }
+
     console.log(`[RabbitMQ] Connected to queue: ${this.queue}`);
   }
 

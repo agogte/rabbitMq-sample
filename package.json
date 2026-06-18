@@ -6,6 +6,7 @@
     "start": "node start.js",
     "start:api": "node src/app.js",
     "start:subscriber": "node subscriber.js",
+    "load-test": "node load-test.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -15,10 +16,14 @@
   "dependencies": {
     "amqplib": "^0.10.9",
     "axios": "^1.12.2",
+    "better-sqlite3": "^12.11.1",
     "dotenv": "^17.2.3",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^13.0.0",
     "yamljs": "^0.3.0"
+  },
+  "devDependencies": {
+    "autocannon": "^8.0.0"
   }
 }

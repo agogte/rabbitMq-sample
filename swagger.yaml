@@ -25,6 +25,10 @@ paths:
                 taxData:
                   type: string
                   example: base64-tax-file
+                simulateFailure:
+                  type: boolean
+                  description: When true, the subscriber simulates a processing failure and the message is dead-lettered to taxSubmissions.dlq
+                  example: false
       responses:
         "202":
           description: Accepted
@@ -39,3 +43,18 @@ paths:
           description: Bad request
         "500":
           description: Server error
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  rabbitmq: { type: string }
+        "503":
+          description: Unhealthy

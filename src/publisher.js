@@ -1,4 +1,6 @@
-async function publishTaxSubmission(userId, taxData, rabbitMQ) {
+const { recordAudit } = require("./db");
+
+async function publishTaxSubmission(userId, taxData, rabbitMQ, { simulateFailure = false } = {}) {
   try {
     const { v4: uuidv4 } = await import("uuid"); // Dynamic import for ESM
     const channel = await rabbitMQ.getChannel();
@@ -9,9 +11,11 @@ async function publishTaxSubmission(userId, taxData, rabbitMQ) {
       confirmation: confirmationNumber,
       userId,
       taxData,
+      simulateFailure,
     });
 
     channel.sendToQueue(QUEUE_NAME, Buffer.from(message), { persistent: true });
+    recordAudit(confirmationNumber, "published");
     console.log(`Submission sent to queue: ${confirmationNumber}`);
     return confirmationNumber;
   } catch (error) {
