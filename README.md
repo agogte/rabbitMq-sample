@@ -136,9 +136,9 @@ A SQLite database (`better-sqlite3`, file at `DB_PATH`, default
 `./data/app.db` — `/app/data/app.db` inside Docker, persisted in the
 `dbdata` volume) tracks message lifecycle:
 
-| Table             | Columns                                            | Purpose                                  |
-| ----------------- | --------------------------------------------------- | ----------------------------------------- |
-| `message_audit`   | `message_id` (PK), `status`, `processed_at`         | Current state of every message            |
+| Table             | Columns                                                      | Purpose                                    |
+| ----------------- | ------------------------------------------------------------ | ------------------------------------------ |
+| `message_audit`   | `message_id` (PK), `status`, `processed_at`                  | Current state of every message             |
 | `failed_messages` | `id`, `message_id`, `queue`, `payload`, `error`, `failed_at` | Full record of every dead-lettered message |
 
 Inspect them directly:
@@ -162,12 +162,12 @@ count, then at 3–5x that (default 4x, tunable via `LOAD_MULTIPLIER`), and
 fails (non-zero exit) if any requests error out, time out, or return a
 non-2xx status. Tune with env vars:
 
-| Variable               | Default | Description                       |
-| ----------------------- | ------- | ---------------------------------- |
-| `LOAD_TEST_URL`          | `http://localhost:3000/submit` | Target endpoint    |
-| `BASELINE_CONNECTIONS`   | `10`    | Baseline concurrent connections    |
-| `LOAD_MULTIPLIER`        | `4`     | Surge multiplier (3-5 recommended) |
-| `LOAD_DURATION`          | `20`    | Seconds per phase                  |
+| Variable               | Default                        | Description                        |
+| ---------------------- | ------------------------------ | ---------------------------------- |
+| `LOAD_TEST_URL`        | `http://localhost:3000/submit` | Target endpoint                    |
+| `BASELINE_CONNECTIONS` | `10`                           | Baseline concurrent connections    |
+| `LOAD_MULTIPLIER`      | `4`                            | Surge multiplier (3-5 recommended) |
+| `LOAD_DURATION`        | `20`                           | Seconds per phase                  |
 
 Run it while watching `http://localhost:15672` → **Overview → Message
 rates** or the `taxSubmissions` queue page to see the traffic surge as a
@@ -251,10 +251,10 @@ docker compose logs -f api
 
 ## Environment Variables
 
-| Variable       | Default                | Description         |
-| -------------- | ---------------------- | ------------------- |
-| `PORT`         | `3000`                 | API port            |
-| `RABBITMQ_URL` | `amqp://rabbitmq:5672` | RabbitMQ connection |
+| Variable       | Default                | Description          |
+| -------------- | ---------------------- | -------------------- |
+| `PORT`         | `3000`                 | API port             |
+| `RABBITMQ_URL` | `amqp://rabbitmq:5672` | RabbitMQ connection  |
 | `DB_PATH`      | `./data/app.db`        | SQLite audit DB path |
 
 ---
@@ -302,7 +302,7 @@ Supports `SIGTERM` and `SIGINT`:
 
 ## License
 
-MIT © Your Name
+MIT © Advait Gogte
 
 ---
 
