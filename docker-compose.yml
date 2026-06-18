@@ -7,6 +7,9 @@ services:
     environment:
       - RABBITMQ_URL=amqp://rabbitmq:5672
       - PORT=3000
+      - DB_PATH=/app/data/app.db
+    volumes:
+      - dbdata:/app/data
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -31,3 +34,6 @@ services:
 networks:
   taxnet:
     driver: bridge
+
+volumes:
+  dbdata:

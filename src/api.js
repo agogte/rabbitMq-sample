@@ -36,10 +36,22 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDoc));
 const rabbitMQ = new RabbitMQBuilder()
   .withUrl(process.env.RABBITMQ_URL)
   .withQueue("taxSubmissions", { durable: true })
+  .withDeadLetter({
+    exchange: "taxSubmissions.dlx",
+    routingKey: "taxSubmissions.failed",
+    queue: "taxSubmissions.dlq",
+  })
   .build();
 
+app.get("/health", (req, res) => {
+  const connected = Boolean(rabbitMQ.channel);
+  res
+    .status(connected ? HttpStatusCode.Ok : HttpStatusCode.ServiceUnavailable)
+    .json({ status: connected ? "healthy" : "unhealthy", rabbitmq: connected ? "connected" : "disconnected" });
+});
+
 app.post("/submit", async (req, res, next) => {
-  const { userId, taxData } = req.body;
+  const { userId, taxData, simulateFailure } = req.body;
 
   if (!userId || !taxData) {
     return res
@@ -51,7 +63,8 @@ app.post("/submit", async (req, res, next) => {
     const confirmationNumber = await publishTaxSubmission(
       userId,
       taxData,
-      rabbitMQ
+      rabbitMQ,
+      { simulateFailure: Boolean(simulateFailure) }
     );
     res.status(HttpStatusCode.Accepted).json({
       message: "Submission received",
